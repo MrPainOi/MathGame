@@ -1,0 +1,1658 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RayMathX — Game Matematika Nilai Mutlak</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:   #0A0E27;
+    --navy2:  #111632;
+    --blue:   #4A90E2;
+    --blue2:  #2D6BC4;
+    --gold:   #FFD700;
+    --coral:  #FF6B6B;
+    --mint:   #00E5A0;
+    --purple: #9B59B6;
+    --white:  #F0F4FF;
+    --gray:   #8892B0;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family:'Inter',sans-serif;
+    background:var(--navy);
+    color:var(--white);
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+
+  /* ---- canvas ---- */
+  #bgCanvas {
+    position:fixed; top:0; left:0;
+    width:100%; height:100%;
+    z-index:0; pointer-events:none;
+  }
+
+  /* ---- screens (FIXED RESPONSIVE) ---- */
+  .screen {
+    position:fixed; inset:0;
+    display:none; flex-direction:column;
+    align-items:center; justify-content:flex-start;
+    z-index:10; padding:30px 20px;
+    overflow-y:auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .screen::before, .screen::after {
+    content: '';
+    margin: auto;
+  }
+  .screen.active { display:flex; }
+  .screen > div, .screen > table, .screen > .levels-grid, .screen > .game-area {
+    z-index: 2;
+  }
+
+  /* ---- keyframes ---- */
+  @keyframes fadeInUp {
+    from { opacity:0; transform:translateY(36px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+  @keyframes fadeInScale {
+    from { opacity:0; transform:scale(0.82); }
+    to   { opacity:1; transform:scale(1); }
+  }
+  @keyframes float {
+    0%,100 { transform:translateY(0); }
+    50%      { transform:translateY(-10px); }
+  }
+  @keyframes shimmer {
+    0%   { background-position:-200% center; }
+    100% { background-position:200% center; }
+  }
+  @keyframes portalOpen {
+    0%   { clip-path:circle(0% at 50% 50%); opacity:0; }
+    100% { clip-path:circle(150% at 50% 50%); opacity:1; }
+  }
+  @keyframes portalClose {
+    0%   { clip-path:circle(150% at 50% 50%); opacity:1; }
+    100% { clip-path:circle(0% at 50% 50%); opacity:0; }
+  }
+  @keyframes spin  { to { transform:rotate(360deg); } }
+  @keyframes shake {
+    0%,100% { transform:translateX(0); }
+    20%,60% { transform:translateX(-8px); }
+    40%,80% { transform:translateX(8px); }
+  }
+  @keyframes bounceIn {
+    0%  { transform:scale(0); }
+    60% { transform:scale(1.2); }
+    100%{ transform:scale(1); }
+  }
+  @keyframes starPop {
+    0%  { transform:scale(0) rotate(-30deg); opacity:0; }
+    60% { transform:scale(1.3) rotate(10deg); opacity:1; }
+    100%{ transform:scale(1) rotate(0deg); opacity:1; }
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow:0 0 0 0 rgba(255,215,0,0.4); }
+    50%      { box-shadow:0 0 0 12px rgba(255,215,0,0); }
+  }
+
+  /* ---- portal ---- */
+  .portal-transition {
+    position:fixed; inset:0;
+    background:radial-gradient(circle,var(--blue) 0%,var(--navy) 70%);
+    z-index:999;
+    display:none; align-items:center; justify-content:center;
+    flex-direction:column; gap:20px;
+  }
+  .portal-transition.show { display:flex; animation:portalOpen .6s ease forwards; }
+  .portal-transition.hide { display:flex; animation:portalClose .5s ease forwards; }
+  .portal-ring {
+    width:90px; height:90px;
+    border:4px solid var(--gold);
+    border-top-color:transparent;
+    border-radius:50%;
+    animation:spin .8s linear infinite;
+  }
+  .portal-text {
+    font-family:'Rajdhani',sans-serif;
+    font-size:1.6rem; color:var(--gold); font-weight:700;
+  }
+
+  /* ---- card ---- */
+  .card {
+    background:rgba(17,22,50,0.93);
+    border:1px solid rgba(74,144,226,0.28);
+    border-radius:20px;
+    backdrop-filter:blur(10px);
+    box-shadow:0 8px 40px rgba(0,0,0,0.4),0 0 0 1px rgba(74,144,226,0.08);
+  }
+
+  /* ---- buttons ---- */
+  .btn {
+    font-family:'Rajdhani',sans-serif;
+    font-weight:600; font-size:1.05rem;
+    padding:12px 28px; border-radius:12px;
+    border:none; cursor:pointer;
+    transition:all .25s; letter-spacing:.5px;
+    position:relative; overflow:hidden;
+  }
+  .btn::after {
+    content:''; position:absolute; inset:0;
+    background:rgba(255,255,255,0.08);
+    opacity:0; transition:opacity .2s;
+  }
+  .btn:hover::after { opacity:1; }
+  .btn:active { transform:scale(0.97); }
+  .btn-primary {
+    background:linear-gradient(135deg,var(--blue),var(--blue2));
+    color:white;
+    box-shadow:0 4px 18px rgba(74,144,226,0.4);
+  }
+  .btn-primary:hover { box-shadow:0 6px 26px rgba(74,144,226,0.6); transform:translateY(-2px); }
+  .btn-gold {
+    background:linear-gradient(135deg,#FFD700,#FFA500);
+    color:var(--navy);
+    box-shadow:0 4px 18px rgba(255,215,0,0.3);
+  }
+  .btn-gold:hover { box-shadow:0 6px 26px rgba(255,215,0,0.5); transform:translateY(-2px); }
+  .btn-outline {
+    background:transparent;
+    border:2px solid var(--blue);
+    color:var(--blue);
+  }
+  .btn-outline:hover { background:rgba(74,144,226,0.1); }
+  .btn-danger {
+    background:linear-gradient(135deg,#c0392b,#e74c3c);
+    color:white;
+    box-shadow:0 4px 18px rgba(231,76,60,0.3);
+  }
+  .btn-danger:hover { box-shadow:0 6px 26px rgba(231,76,60,0.5); transform:translateY(-2px); }
+
+  /* ==============================================
+     SCREEN 1 — SPLASH
+  ============================================== */
+  .intro-logo {
+    font-family:'Rajdhani',sans-serif;
+    font-size:clamp(3.2rem,9vw,5.8rem);
+    font-weight:700;
+    background:linear-gradient(90deg,var(--blue),var(--mint),var(--gold),var(--coral),var(--blue));
+    background-size:200% auto;
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+    background-clip:text;
+    animation:shimmer 3s linear infinite, float 3s ease-in-out infinite;
+    text-align:center; line-height:1;
+  }
+
+  /* materi section */
+  .materi-grid {
+    display:grid; grid-template-columns:1fr 1fr;
+    gap:14px; width:100%; max-width:860px;
+    margin-top:4px;
+  }
+  @media(max-width:640px){ .materi-grid{ grid-template-columns:1fr; } }
+  .materi-card {
+    padding:20px 22px;
+  }
+  .materi-card-title {
+    font-family:'Rajdhani',sans-serif;
+    font-size:1rem; font-weight:700;
+    color:var(--blue); letter-spacing:1px;
+    text-transform:uppercase; margin-bottom:10px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .materi-card-title .mc-dot {
+    width:8px; height:8px; border-radius:50%;
+    flex-shrink:0;
+  }
+  .materi-card p {
+    font-size:.88rem; color:var(--gray);
+    line-height:1.65;
+  }
+  .materi-card ul {
+    list-style:none; display:flex;
+    flex-direction:column; gap:6px;
+  }
+  .materi-card ul li {
+    font-size:.88rem; color:var(--white);
+    display:flex; align-items:flex-start; gap:8px; line-height:1.5;
+  }
+  .materi-card ul li::before {
+    content:''; display:block;
+    min-width:5px; height:5px; border-radius:50%;
+    background:var(--mint); margin-top:7px;
+  }
+  .formula-row {
+    display:grid; grid-template-columns:1fr 1fr;
+    gap:8px; margin-top:4px;
+  }
+  .formula-box {
+    background:rgba(74,144,226,0.08);
+    border:1px solid rgba(74,144,226,0.22);
+    border-radius:10px; padding:10px 14px;
+    font-family:'Rajdhani',sans-serif;
+    font-size:1.05rem; font-weight:600;
+    text-align:center; color:var(--gold);
+  }
+  .formula-box span {
+    display:block; font-size:.72rem;
+    color:var(--gray); font-family:'Inter',sans-serif;
+    font-weight:400; margin-top:3px;
+  }
+
+  /* ==============================================
+     SCREEN 2 — IDENTITY
+  ============================================== */
+  .identity-header {
+    width:100%; max-width:700px;
+    text-align:center; margin-bottom:26px;
+    animation:fadeInUp .5s ease;
+  }
+  .identity-header h1 {
+    font-family:'Rajdhani',sans-serif;
+    font-size:clamp(1.7rem,4vw,2.6rem);
+    font-weight:700; color:var(--gold);
+  }
+  .identity-header p { color:var(--gray); font-size:.9rem; margin-top:5px; }
+  .identity-grid {
+    display:grid; grid-template-columns:1fr 1fr;
+    gap:18px; width:100%; max-width:880px;
+    animation:fadeInUp .6s ease .1s both;
+  }
+  @media(max-width:660px){ .identity-grid{ grid-template-columns:1fr; } }
+  .identity-card { padding:22px; }
+  .identity-card-icon {
+    width:40px; height:40px; border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:1.2rem; margin-bottom:12px;
+  }
+  .icon-blue  { background:rgba(74,144,226,0.18); }
+  .icon-gold  { background:rgba(255,215,0,0.14); }
+  .icon-mint  { background:rgba(0,229,160,0.14); }
+  .icon-coral { background:rgba(255,107,107,0.14); }
+  .identity-card h3 {
+    font-family:'Rajdhani',sans-serif;
+    font-size:1.05rem; font-weight:700;
+    color:var(--blue); margin-bottom:10px;
+    text-transform:uppercase; letter-spacing:1px;
+  }
+  .identity-card ul { list-style:none; }
+  .identity-card ul li {
+    color:var(--white); font-size:.88rem;
+    padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.05);
+    line-height:1.5;
+  }
+  .identity-card ul li:last-child { border-bottom:none; }
+  .identity-card ul li span { color:var(--gray); font-size:.8rem; display:block; }
+  .tujuan-item { display:flex; gap:10px; align-items:flex-start; padding:6px 0 !important; }
+  .tujuan-dot { min-width:8px; height:8px; border-radius:50%; background:var(--mint); margin-top:5px; }
+  .dev-info { display:flex; flex-direction:column; gap:8px; }
+  .dev-row { display:flex; justify-content:space-between; align-items:center; }
+  .dev-label { color:var(--gray); font-size:.8rem; }
+  .dev-val { color:var(--white); font-size:.88rem; font-weight:500; text-align:right; }
+
+  /* ==============================================
+     SCREEN 3 — LEVEL SELECT
+  ============================================== */
+  .level-title {
+    font-family:'Rajdhani',sans-serif;
+    font-size:clamp(1.5rem,4vw,2.4rem); font-weight:700;
+    text-align:center; color:var(--white);
+    animation:fadeInUp .5s ease;
+  }
+  .level-title span { color:var(--gold); }
+  .levels-grid {
+    display:grid; grid-template-columns:repeat(3,1fr);
+    gap:14px; width:100%; max-width:780px;
+    animation:fadeInUp .55s ease .1s both;
+    margin:20px 0;
+  }
+  @media(max-width:580px){ .levels-grid{ grid-template-columns:repeat(2,1fr); } }
+  .level-card {
+    padding:18px; border-radius:18px; cursor:pointer;
+    transition:all .3s; text-align:center;
+    position:relative; overflow:hidden;
+    border:2px solid transparent;
+  }
+  .level-card:hover:not(.locked) { transform:translateY(-6px) scale(1.03); }
+  .level-card.locked { opacity:.38; cursor:not-allowed; }
+  .level-card.completed { border-style:solid; }
+  .level-card-num {
+    font-family:'Rajdhani',sans-serif;
+    font-size:2rem; font-weight:700; line-height:1;
+  }
+  .level-card-name {
+    font-family:'Space Grotesk',sans-serif;
+    font-size:.72rem; text-transform:uppercase;
+    letter-spacing:1.5px; margin-top:5px;
+  }
+  .level-card-type { font-size:.72rem; margin-top:3px; opacity:.65; }
+  .level-card-stars { display:flex; justify-content:center; gap:3px; margin-top:7px; height:16px; }
+  .level-card-stars svg { width:14px; height:14px; }
+  .lv1 { background:linear-gradient(135deg,#0d1a3a,#1a2d5a); border-color:rgba(74,144,226,.35); }
+  .lv1 .level-card-num { color:var(--blue); }
+  .lv2 { background:linear-gradient(135deg,#1a0d3a,#2d1a5a); border-color:rgba(155,89,182,.35); }
+  .lv2 .level-card-num { color:var(--purple); }
+  .lv3 { background:linear-gradient(135deg,#0d3a1a,#1a5a2d); border-color:rgba(0,229,160,.35); }
+  .lv3 .level-card-num { color:var(--mint); }
+  .lv4 { background:linear-gradient(135deg,#3a1a0d,#5a2d1a); border-color:rgba(255,107,107,.35); }
+  .lv4 .level-card-num { color:var(--coral); }
+  .lv5 { background:linear-gradient(135deg,#3a350d,#5a521a); border-color:rgba(255,215,0,.35); }
+  .lv5 .level-card-num { color:var(--gold); }
+  .lv6 { background:linear-gradient(135deg,#1a0d3a,#3a0d1a); border-color:rgba(255,100,200,.35); }
+  .lv6 .level-card-num {
+    background:linear-gradient(135deg,var(--gold),var(--coral));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  }
+  .lv6-lock-note {
+    font-size:.7rem; color:var(--gray);
+    margin-top:5px; line-height:1.4;
+  }
+
+  /* ==============================================
+     SCREEN 4 — GAME
+  ============================================== */
+  #screen-game {
+    padding:16px; justify-content:flex-start; padding-top:85px;
+  }
+  .game-topbar {
+    position:fixed; top:0; left:0; right:0; height:58px;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 20px;
+    background:rgba(10,14,39,0.96);
+    backdrop-filter:blur(12px);
+    border-bottom:1px solid rgba(74,144,226,0.18);
+    z-index:100;
+  }
+  .topbar-level {
+    font-family:'Rajdhani',sans-serif;
+    font-size:1.05rem; font-weight:700;
+  }
+  .topbar-score {
+    font-family:'Rajdhani',sans-serif;
+    font-size:1.05rem; font-weight:700; color:var(--gold);
+  }
+  .topbar-lives { display:flex; gap:4px; align-items:center; }
+  .topbar-lives svg { width:18px; height:18px; }
+  .progress-bar-wrap {
+    position:fixed; top:58px; left:0; right:0;
+    height:3px; background:rgba(255,255,255,0.08); z-index:100;
+  }
+  .progress-bar-fill {
+    height:100%;
+    background:linear-gradient(90deg,var(--blue),var(--mint));
+    transition:width .5s ease;
+  }
+  .game-area {
+    width:100%; max-width:700px;
+    display:flex; flex-direction:column;
+    align-items:center; gap:20px;
+    padding-bottom:40px;
+  }
+
+  /* question header */
+  .q-header {
+    width:100%; display:flex; align-items:center;
+    gap:10px; animation:fadeInUp .35s ease;
+  }
+  .q-badge {
+    font-family:'Rajdhani',sans-serif;
+    font-size:.82rem; font-weight:700;
+    padding:4px 14px; border-radius:20px;
+    text-transform:uppercase; letter-spacing:1px;
+    white-space:nowrap;
+  }
+  .q-progress { color:var(--gray); font-size:.88rem; }
+
+  /* question card */
+  .question-card { width:100%; padding:26px; animation:fadeInUp .38s ease .08s both; }
+  .question-label {
+    font-size:.75rem; color:var(--gray);
+    text-transform:uppercase; letter-spacing:2px;
+    margin-bottom:10px; font-family:'Space Grotesk',sans-serif;
+  }
+  .question-text {
+    font-family:'Rajdhani',sans-serif;
+    font-size:clamp(1.1rem,3vw,1.5rem);
+    font-weight:600; line-height:1.5; color:var(--white);
+  }
+  .question-math {
+    font-size:clamp(1.7rem,5vw,2.3rem);
+    color:var(--gold); font-family:'Rajdhani',sans-serif;
+    font-weight:700; text-align:center; padding:12px 0;
+  }
+
+  /* ---- multiple choice ---- */
+  .options-grid {
+    width:100%; display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px; animation:fadeInUp .38s ease .15s both;
+  }
+  @media(max-width:460px){ .options-grid{ grid-template-columns:1fr; } }
+  .option-btn {
+    padding:14px 16px; border-radius:13px;
+    background:rgba(17,22,50,0.8);
+    border:2px solid rgba(74,144,226,0.22);
+    color:var(--white); cursor:pointer;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:.95rem; font-weight:500;
+    transition:all .22s; text-align:left;
+    display:flex; align-items:center; gap:10px;
+  }
+  .option-btn:hover:not(:disabled) {
+    border-color:var(--blue);
+    background:rgba(74,144,226,0.1);
+    transform:translateX(4px);
+  }
+  .option-btn.correct { border-color:var(--mint)!important; background:rgba(0,229,160,0.13)!important; color:var(--mint); }
+  .option-btn.wrong   { border-color:var(--coral)!important; background:rgba(255,107,107,0.13)!important; animation:shake .4s ease; }
+  .option-btn:disabled { cursor:not-allowed; }
+  .opt-letter {
+    min-width:30px; height:30px; border-radius:7px;
+    background:rgba(74,144,226,0.18);
+    border:1px solid rgba(74,144,226,0.28);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Rajdhani',sans-serif; font-weight:700;
+    font-size:.95rem; color:var(--blue); transition:all .2s;
+  }
+  .option-btn.correct .opt-letter { background:rgba(0,229,160,0.28); border-color:var(--mint); color:var(--mint); }
+  .option-btn.wrong   .opt-letter { background:rgba(255,107,107,0.28); border-color:var(--coral); color:var(--coral); }
+
+  /* ---- true/false ---- */
+  .tf-container {
+    width:100%; display:flex; gap:14px;
+    animation:fadeInUp .38s ease .15s both;
+  }
+  .tf-btn {
+    flex:1; padding:28px 16px; border-radius:16px;
+    background:rgba(17,22,50,0.8);
+    border:2px solid rgba(74,144,226,0.22);
+    color:var(--white); cursor:pointer;
+    font-family:'Rajdhani',sans-serif;
+    font-size:1.4rem; font-weight:700;
+    transition:all .25s; text-align:center;
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+  }
+  .tf-btn:hover:not(:disabled) { transform:translateY(-4px); }
+  .tf-btn.true-btn:hover:not(:disabled)  { border-color:var(--mint); background:rgba(0,229,160,0.08); }
+  .tf-btn.false-btn:hover:not(:disabled) { border-color:var(--coral); background:rgba(255,107,107,0.08); }
+  .tf-btn.correct { border-color:var(--mint); background:rgba(0,229,160,0.14); }
+  .tf-btn.wrong   { border-color:var(--coral); background:rgba(255,107,107,0.14); animation:shake .4s ease; }
+
+  /* ---- sort ---- */
+  .sort-container { width:100%; animation:fadeInUp .38s ease .15s both; }
+  .sort-instruction {
+    font-size:.83rem; color:var(--gray);
+    margin-bottom:12px; text-align:center;
+    font-family:'Space Grotesk',sans-serif;
+  }
+  .sort-items {
+    display:flex; flex-wrap:wrap; gap:8px;
+    justify-content:center; margin-bottom:18px;
+  }
+  .sort-item {
+    padding:10px 18px; border-radius:11px;
+    background:rgba(17,22,50,0.8);
+    border:2px solid rgba(74,144,226,0.28);
+    font-family:'Rajdhani',sans-serif;
+    font-size:1.1rem; font-weight:700;
+    cursor:pointer; transition:all .2s; user-select:none;
+  }
+  .sort-item:hover:not(.si-used) { border-color:var(--blue); transform:translateY(-2px); }
+  .sort-item.si-selected { border-color:var(--gold); background:rgba(255,215,0,0.1); }
+  .sort-item.si-used { opacity:.3; cursor:default; }
+  .sort-slots { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+  .sort-slot {
+    min-width:78px; min-height:50px;
+    border-radius:11px;
+    border:2px dashed rgba(74,144,226,0.28);
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    font-family:'Rajdhani',sans-serif;
+    font-size:1.1rem; font-weight:700;
+    transition:all .2s; padding:6px 14px;
+    cursor:pointer;
+  }
+  .sort-slot:hover { border-color:rgba(74,144,226,.6); }
+  .sort-slot.filled { border-style:solid; border-color:rgba(74,144,226,.4); }
+  .sort-slot.correct-slot { border-color:var(--mint); color:var(--mint); background:rgba(0,229,160,.1); }
+  .sort-slot.wrong-slot   { border-color:var(--coral); color:var(--coral); background:rgba(255,107,107,.1); }
+  .slot-num { font-size:.65rem; color:var(--gray); letter-spacing:1px; }
+
+  /* ---- numline ---- */
+  .numline-container { width:100%; animation:fadeInUp .38s ease .15s both; }
+  .numline-task {
+    font-family:'Rajdhani',sans-serif;
+    font-size:1.05rem; color:var(--gray);
+    text-align:center; margin-bottom:14px;
+  }
+  .numline-wrap {
+    position:relative; height:80px; margin:0 16px; cursor:pointer;
+  }
+  .numline-track {
+    position:absolute; top:50%; left:0; right:0;
+    height:4px; background:rgba(255,255,255,0.14);
+    border-radius:2px; transform:translateY(-50%);
+  }
+  .numline-fill {
+    position:absolute; top:0; height:100%;
+    background:var(--blue); border-radius:2px;
+  }
+  .numline-ticks { position:absolute; inset:0; }
+  .numline-tick {
+    position:absolute; top:50%;
+    width:2px; height:10px;
+    background:rgba(255,255,255,0.25);
+    transform:translate(-50%,-50%);
+  }
+  .numline-label {
+    position:absolute; top:100%; margin-top:5px;
+    font-size:.72rem; color:var(--gray);
+    transform:translateX(-50%);
+    font-family:'Rajdhani',sans-serif; font-weight:600;
+  }
+  .numline-handle {
+    position:absolute; top:50%;
+    width:26px; height:26px; border-radius:50%;
+    background:var(--gold); border:3px solid var(--navy);
+    transform:translate(-50%,-50%);
+    cursor:grab; z-index:10;
+    box-shadow:0 0 10px rgba(255,215,0,.5);
+    animation:pulse 2s ease infinite;
+  }
+  .numline-handle:active { cursor:grabbing; }
+  .numline-value-display {
+    text-align:center; margin-top:38px;
+    font-family:'Rajdhani',sans-serif;
+    font-size:2rem; font-weight:700; color:var(--gold);
+  }
+  .numline-check-row { display:flex; justify-content:center; margin-top:14px; }
+
+  /* ---- feedback overlay ---- */
+  .feedback-overlay {
+    position:fixed; inset:0; z-index:200;
+    display:none; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.48);
+  }
+  .feedback-overlay.show { display:flex; }
+  .feedback-card {
+    padding:28px 36px; border-radius:22px;
+    text-align:center; max-width:340px;
+    animation:bounceIn .45s cubic-bezier(.34,1.56,.64,1);
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+  }
+  .feedback-icon-holder { width:56px; height:56px; display:flex; align-items:center; justify-content:center; margin-bottom:4px; }
+  .feedback-icon-holder svg { width:100%; height:100%; }
+  .feedback-title {
+    font-family:'Rajdhani',sans-serif;
+    font-size:1.7rem; font-weight:700; margin-bottom:2px;
+  }
+  .feedback-msg  { color:var(--gray); font-size:.9rem; line-height:1.6; }
+  .feedback-pts  {
+    font-family:'Rajdhani',sans-serif;
+    font-size:1.2rem; font-weight:700; color:var(--gold); margin-top:4px;
+  }
+
+  /* ---- level complete ---- */
+  #screen-levelcomplete { gap:22px; }
+  .lc-title {
+    font-family:'Rajdhani',sans-serif;
+    font-size:clamp(2rem,5vw,3rem); font-weight:700;
+    color:var(--gold); text-align:center;
+    animation:fadeInScale .55s ease;
+  }
+  .lc-stars { display:flex; gap:12px; height:45px; animation:fadeInUp .5s ease .18s both; }
+  .lc-stars svg { width:42px; height:42px; animation:starPop .4s ease both; }
+  .lc-stars svg:nth-child(2){ animation-delay:.14s; }
+  .lc-stars svg:nth-child(3){ animation-delay:.28s; }
+  .lc-stats {
+    display:flex; gap:20px; flex-wrap:wrap;
+    justify-content:center; animation:fadeInUp .5s ease .28s both;
+  }
+  .lc-stat { text-align:center; padding:14px 22px; border-radius:13px; min-width:100px; }
+  .lc-stat-val {
+    font-family:'Rajdhani',sans-serif;
+    font-size:2rem; font-weight:700; color:var(--blue);
+  }
+  .lc-stat-label { font-size:.78rem; color:var(--gray); margin-top:3px; }
+  .lc-actions {
+    display:flex; gap:12px; flex-wrap:wrap;
+    justify-content:center; animation:fadeInUp .5s ease .36s both;
+  }
+
+  /* ---- final ---- */
+  #screen-final { gap:22px; }
+  .final-title {
+    font-family:'Rajdhani',sans-serif;
+    font-size:clamp(2.2rem,6vw,3.6rem); font-weight:700;
+    text-align:center;
+    background:linear-gradient(135deg,var(--gold),var(--coral),var(--blue));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+    animation:fadeInScale .65s ease;
+  }
+  .final-score-circle {
+    width:150px; height:150px; border-radius:50%;
+    border:4px solid var(--gold);
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    background:rgba(255,215,0,.08);
+    box-shadow:0 0 36px rgba(255,215,0,.3);
+    animation:bounceIn .75s ease;
+  }
+  .final-score-num {
+    font-family:'Rajdhani',sans-serif;
+    font-size:2.8rem; font-weight:700; color:var(--gold); line-height:1;
+  }
+  .final-score-label { font-size:.78rem; color:var(--gray); margin-top:3px; }
+  .final-message {
+    font-family:'Rajdhani',sans-serif;
+    font-size:1.35rem; text-align:center; color:var(--white);
+    animation:fadeInUp .5s ease .28s both;
+    max-width:480px; line-height:1.5;
+  }
+
+  /* bg per level */
+  .bg-lv1 { background:linear-gradient(180deg,#030715,#071a40); }
+  .bg-lv2 { background:linear-gradient(180deg,#0d0320,#1a0840); }
+  .bg-lv3 { background:linear-gradient(180deg,#031a0a,#073a15); }
+  .bg-lv4 { background:linear-gradient(180deg,#1a0303,#3a0a0a); }
+  .bg-lv5 { background:linear-gradient(180deg,#1a1503,#3a2e07); }
+  .bg-lv6 { background:linear-gradient(180deg,#0d0320,#1a050d); }
+</style>
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+
+<!-- Portal -->
+<div class="portal-transition" id="portalTransition">
+  <div class="portal-ring"></div>
+  <div class="portal-text" id="portalText">Memuat...</div>
+</div>
+
+<!-- Feedback Overlay -->
+<div class="feedback-overlay" id="feedbackOverlay">
+  <div class="feedback-card card" id="feedbackCard">
+    <div class="feedback-icon-holder" id="feedbackIconHolder"></div>
+    <div class="feedback-title" id="feedbackTitle"></div>
+    <div class="feedback-msg"   id="feedbackMsg"></div>
+    <div class="feedback-pts"   id="feedbackPts"></div>
+  </div>
+</div>
+
+<!-- ===================================================
+     SCREEN 1 — SPLASH + MATERI (REVISED HEADERS REMOVED)
+=================================================== -->
+<div class="screen active" id="screen-intro">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:18px;width:100%;max-width:900px;animation:fadeInUp .7s ease;">
+    <div class="intro-logo" style="margin-bottom:10px;">RayMathX</div>
+
+    <!-- Materi Section -->
+    <div class="materi-grid">
+      <div class="materi-card card">
+        <div class="materi-card-title">
+          <div class="mc-dot" style="background:var(--blue)"></div>
+          Konsep Nilai Mutlak
+        </div>
+        <p>
+          Nilai mutlak suatu bilangan real <strong style="color:var(--white)">x</strong>, ditulis <strong style="color:var(--gold)">|x|</strong>,
+          menyatakan jarak bilangan tersebut dari titik nol pada garis bilangan.
+          Karena jarak tidak pernah bernilai negatif, berlaku <strong style="color:var(--white)">|x| &ge; 0</strong> untuk setiap x.
+        </p>
+      </div>
+
+      <div class="materi-card card">
+        <div class="materi-card-title">
+          <div class="mc-dot" style="background:var(--gold)"></div>
+          Definisi Formal
+        </div>
+        <div class="formula-row">
+          <div class="formula-box">|x| = x <span>jika x &ge; 0</span></div>
+          <div class="formula-box">|x| = &minus;x <span>jika x &lt; 0</span></div>
+        </div>
+        <p style="margin-top:10px;font-size:.82rem;color:var(--gray);line-height:1.6;">
+          Menjelaskan bahwa nilai mutlak selalu menghasilkan bilangan positif atau nol. Contoh: |&minus;7| = 7, |5| = 5.
+        </p>
+      </div>
+
+      <div class="materi-card card">
+        <div class="materi-card-title">
+          <div class="mc-dot" style="background:var(--mint)"></div>
+          Fungsi dalam Matematika
+        </div>
+        <ul>
+          <li>Menghitung jarak dua titik pada garis bilangan: |a &minus; b|</li>
+          <li>Menyelesaikan persamaan nilai mutlak kompleks</li>
+          <li>Mengukur galat (error) atau selisih dalam analisis statistik</li>
+        </ul>
+      </div>
+
+      <div class="materi-card card">
+        <div class="materi-card-title">
+          <div class="mc-dot" style="background:var(--coral)"></div>
+          Sifat-Sifat Penting
+        </div>
+        <ul>
+          <li>|xy| = |x| &middot; |y| — Sifat Perkalian</li>
+          <li>|x/y| = |x|/|y| — Sifat Pembagian (y &ne; 0)</li>
+          <li>|x| = |&minus;x| — Sifat Simetri Tanda Bilangan</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:14px;margin-top:6px;flex-wrap:wrap;justify-content:center;">
+      <button class="btn btn-outline" onclick="startBGM(); playSound('click'); goToIdentity()">Lihat Identitas</button>
+      <button class="btn btn-gold"    onclick="startBGM(); playSound('click'); goToLevels()"  style="font-size:1.1rem;padding:14px 40px;">
+        Mulai Bermain
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================================================
+     SCREEN 2 — IDENTITY
+=================================================== -->
+<div class="screen" id="screen-identity">
+  <div class="identity-header">
+    <h1>Identitas Pembelajaran</h1>
+    <p>Informasi lengkap tentang media pembelajaran ini</p>
+  </div>
+  <div class="identity-grid">
+    <div class="identity-card card">
+      <div class="identity-card-icon icon-blue" style="font-size:1.1rem;font-weight:700;font-family:'Rajdhani',sans-serif;color:var(--blue);">T</div>
+      <h3>Tujuan Pembelajaran</h3>
+      <ul>
+        <li class="tujuan-item"><div class="tujuan-dot"></div><span>Memahami konsep dan definisi nilai mutlak</span></li>
+        <li class="tujuan-item"><div class="tujuan-dot"></div><span>Menghitung nilai mutlak dari bilangan real</span></li>
+        <li class="tujuan-item"><div class="tujuan-dot"></div><span>Menyelesaikan persamaan nilai mutlak</span></li>
+        <li class="tujuan-item"><div class="tujuan-dot"></div><span>Menginterpretasikan nilai mutlak pada garis bilangan</span></li>
+      </ul>
+    </div>
+
+    <div class="identity-card card">
+      <div class="identity-card-icon icon-gold" style="font-size:1.1rem;font-weight:700;font-family:'Rajdhani',sans-serif;color:var(--gold);">R</div>
+      <h3>Referensi</h3>
+      <ul>
+        <li>Matematika SMA Kelas X (Kemendikbud, 2022)<span>Bab 2: Nilai Mutlak</span></li>
+        <li>Sukino, dkk. — Matematika untuk SMA/MA Kelas X<span>Penerbit Erlangga, 2022</span></li>
+        <li>Khan Academy — Absolute Value<span>khanacademy.org</span></li>
+      </ul>
+    </div>
+
+    <div class="identity-card card" style="grid-column:1/-1;">
+      <div class="identity-card-icon icon-coral" style="font-size:1.1rem;font-weight:700;font-family:'Rajdhani',sans-serif;color:var(--coral);">P</div>
+      <h3>Pengembang</h3>
+      <div class="dev-info">
+        <div class="dev-row"><span class="dev-label">Nama</span><span class="dev-val">Tim Pengembang Media Pembelajaran</span></div>
+        <div class="dev-row"><span class="dev-label">Email</span><span class="dev-val">timdev@sman1batam.sch.id</span></div>
+        <div class="dev-row"><span class="dev-label">Unit Kerja</span><span class="dev-val">Siswa SMA Negeri 1 Batam</span></div>
+        <div class="dev-row"><span class="dev-label">Tahun Ajaran</span><span class="dev-val">2025 / 2026</span></div>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;gap:14px;margin-top:22px;animation:fadeInUp .5s ease .35s both;flex-wrap:wrap;justify-content:center;">
+    <button class="btn btn-outline" onclick="playSound('click');goToIntro()">Kembali</button>
+    <button class="btn btn-gold"    onclick="playSound('click');goToLevels()">Lanjut ke Level</button>
+  </div>
+</div>
+
+<!-- ===================================================
+     SCREEN 3 — LEVEL SELECT
+=================================================== -->
+<div class="screen" id="screen-levels">
+  <div class="level-title">Pilih <span>Level</span></div>
+  <p style="color:var(--gray);text-align:center;font-size:.88rem;margin-top:-10px;animation:fadeInUp .5s ease .06s both;">
+    Selesaikan setiap level untuk membuka tingkatan berikutnya
+  </p>
+  <div class="levels-grid" id="levelsGrid"></div>
+  <div style="display:flex;gap:14px;margin-top:4px;animation:fadeInUp .5s ease .28s both;flex-wrap:wrap;justify-content:center;align-items:center;">
+    <button class="btn btn-outline" onclick="playSound('click');goToIntro()">Kembali</button>
+  </div>
+</div>
+
+<!-- ===================================================
+     SCREEN 4 — GAME
+=================================================== -->
+<div class="screen" id="screen-game">
+  <div class="game-topbar">
+    <div class="topbar-level" id="topbarLevel">Level 1</div>
+    <div class="topbar-lives"  id="topbarLives"></div>
+    <div class="topbar-score"  id="topbarScore">0 pts</div>
+  </div>
+  <div class="progress-bar-wrap">
+    <div class="progress-bar-fill" id="progressBarFill" style="width:0%"></div>
+  </div>
+  <div class="game-area" id="gameArea"></div>
+</div>
+
+<!-- ===================================================
+     SCREEN 5 — LEVEL COMPLETE
+=================================================== -->
+<div class="screen" id="screen-levelcomplete">
+  <div class="lc-title" id="lcTitle">Level Selesai</div>
+  <div class="lc-stars" id="lcStars"></div>
+  <div class="lc-stats">
+    <div class="lc-stat card"><div class="lc-stat-val" id="lcScore">0</div><div class="lc-stat-label">Skor</div></div>
+    <div class="lc-stat card"><div class="lc-stat-val" id="lcCorrect">0/5</div><div class="lc-stat-label">Benar</div></div>
+    <div class="lc-stat card"><div class="lc-stat-val" id="lcTime">0d</div><div class="lc-stat-label">Waktu</div></div>
+  </div>
+  <div class="lc-actions">
+    <button class="btn btn-outline"  onclick="playSound('click');goToLevels()">Pilih Level</button>
+    <button class="btn btn-danger"   id="restartLevelBtn" onclick="playSound('click');restartLevel()">Ulangi Level</button>
+    <button class="btn btn-gold"     id="nextLevelBtn" onclick="playSound('click');nextLevel()">Level Berikutnya</button>
+  </div>
+</div>
+
+<!-- ===================================================
+     SCREEN 6 — FINAL
+=================================================== -->
+<div class="screen" id="screen-final">
+  <div class="final-title">Luar Biasa</div>
+  <p style="color:var(--gray);text-align:center;font-size:.92rem;animation:fadeInUp .5s ease .1s both;">
+    Kamu telah menyelesaikan semua level AbsoluteX
+  </p>
+  <div class="final-score-circle">
+    <div class="final-score-num"   id="finalScoreNum">0</div>
+    <div class="final-score-label">Total Skor</div>
+  </div>
+  <div class="final-message" id="finalMessage">Nilai mutlak sudah kamu kuasai!</div>
+  <div style="display:flex;gap:12px;animation:fadeInUp .5s ease .45s both;flex-wrap:wrap;justify-content:center;">
+    <button class="btn btn-danger"  onclick="playSound('click');resetGame();goToLevels()">Main Ulang</button>
+    <button class="btn btn-outline" onclick="playSound('click');goToIdentity()">Lihat Identitas</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  WEB AUDIO API (SOUND EFFECTS & BACKGROUND MUSIC SYNTH)
+// ============================================================
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let bgmInterval = null;
+let bgmSequence = [261.63, 293.66, 329.63, 349.23, 392.00, 349.23, 329.63, 293.66]; // Melodi Chiptune 8-Bit
+let bgmStep = 0;
+
+function startBGM() {
+  if (bgmInterval) return;
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  
+  // Looping Sequencer Musik Latar Sekunder Sederhana
+  bgmInterval = setInterval(() => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(bgmSequence[bgmStep % bgmSequence.length], audioCtx.currentTime);
+    
+    gain.gain.setValueAtTime(0.015, audioCtx.currentTime); // Volume rendah ramah di telinga
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.35);
+    
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.4);
+    bgmStep++;
+  }, 400);
+}
+
+function playSound(type) {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  const now = audioCtx.currentTime;
+
+  if (type === 'click') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(400, now);
+    osc.frequency.exponentialRampToValueAtTime(10, now + 0.08);
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.linearRampToValueAtTime(0, now + 0.08);
+    osc.start(now);
+    osc.stop(now + 0.08);
+  } else if (type === 'correct') {
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(523.25, now); 
+    osc.frequency.setValueAtTime(659.25, now + 0.09);
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.linearRampToValueAtTime(0, now + 0.22);
+    osc.start(now);
+    osc.stop(now + 0.22);
+  } else if (type === 'wrong') {
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(170, now);
+    osc.frequency.linearRampToValueAtTime(70, now + 0.28);
+    gain.gain.setValueAtTime(0.22, now);
+    gain.gain.linearRampToValueAtTime(0, now + 0.28);
+    osc.start(now);
+    osc.stop(now + 0.28);
+  } else if (type === 'win') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(523.25, now); 
+    osc.frequency.setValueAtTime(659.25, now + 0.08); 
+    osc.frequency.setValueAtTime(783.99, now + 0.16); 
+    osc.frequency.setValueAtTime(1046.50, now + 0.24); 
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.linearRampToValueAtTime(0, now + 0.45);
+    osc.start(now);
+    osc.stop(now + 0.45);
+  }
+}
+
+// ============================================================
+//  SVG IMAGES STORAGE
+// ============================================================
+const SVG_ICONS = {
+  heartFull: `<svg viewBox="0 0 24 24" fill="var(--coral)"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`,
+  heartEmpty: `<svg viewBox="0 0 24 24" fill="none" stroke="var(--gray)" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`,
+  starFull: `<svg viewBox="0 0 24 24" fill="var(--gold)"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>`,
+  starEmpty: `<svg viewBox="0 0 24 24" fill="rgba(255,255,255,0.12)" stroke="var(--gray)" stroke-width="1.5"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>`,
+  check: `<svg viewBox="0 0 24 24" fill="none" stroke="var(--mint)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  cross: `<svg viewBox="0 0 24 24" fill="none" stroke="var(--coral)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`
+};
+
+// ============================================================
+//  PARTICLE BACKGROUND
+// ============================================================
+const canvas = document.getElementById('bgCanvas');
+const ctx    = canvas.getContext('2d');
+let particles = [];
+
+function resizeCanvas(){ canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function mkParticle(){
+  return {
+    x: Math.random()*canvas.width, y: Math.random()*canvas.height,
+    r: Math.random()*1.8+0.4,
+    vx:(Math.random()-.5)*.28, vy:(Math.random()-.5)*.28,
+    alpha:Math.random()*.5+.1,
+    color:['#4A90E2','#00E5A0','#FFD700','#FF6B6B','#9B59B6'][Math.floor(Math.random()*5)]
+  };
+}
+for(let i=0;i<110;i++) particles.push(mkParticle());
+
+(function loop(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  particles.forEach(p=>{
+    p.x+=p.vx; p.y+=p.vy;
+    if(p.x<0) p.x=canvas.width;  if(p.x>canvas.width)  p.x=0;
+    if(p.y<0) p.y=canvas.height; if(p.y>canvas.height) p.y=0;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fillStyle=p.color; ctx.globalAlpha=p.alpha; ctx.fill();
+  });
+  ctx.globalAlpha=1;
+  requestAnimationFrame(loop);
+})();
+
+// ============================================================
+//  LEVEL DATA
+// ============================================================
+const LEVELS = [
+  {
+    id:1, name:'Dasar', type:'Pilihan Ganda', bg:'bg-lv1', color:'#4A90E2',
+    questions:[
+      { q:'Berapakah nilai dari |&minus;7|?', math:'|&minus;7| = ?', opts:['7','&minus;7','49','0'], ans:0 },
+      { q:'Berapakah nilai dari |0|?', math:'|0| = ?', opts:['0','1','&minus;1','Tidak terdefinisi'], ans:0 },
+      { q:'Berapakah nilai dari |15|?', math:'|15| = ?', opts:['&minus;15','0','15','1'], ans:2 },
+      { q:'Berapakah nilai dari |&minus;3| kuadrat?', math:'|&minus;3|&sup2; = ?', opts:['9','&minus;9','6','&minus;6'], ans:0 },
+      { q:'Manakah pernyataan yang SELALU benar tentang nilai mutlak?', math:'Pilih sifat yang benar:', opts:['|x| &ge; 0 untuk semua x','|x| > 0 untuk semua x','|x| = x untuk semua x','|x| = &minus;x untuk semua x'], ans:0 },
+    ]
+  },
+  {
+    id:2, name:'Persamaan', type:'Benar / Salah', bg:'bg-lv2', color:'#9B59B6',
+    questions:[
+      { q:'Apakah pernyataan berikut BENAR?', math:'|x| = 5 &rArr; x = 5 atau x = &minus;5', ans:true, explain:'|x| = 5 memiliki dua solusi: 5 atau &minus;5.' },
+      { q:'Apakah pernyataan berikut BENAR?', math:'|x + 2| = 0 &rArr; x = &minus;2', ans:true, explain:'Nilai mutlak nol hanya terpenuhi jika x + 2 = 0, maka x = &minus;2.' },
+      { q:'Apakah pernyataan berikut BENAR?', math:'|x &minus; 3| = &minus;1 memiliki solusi', ans:false, explain:'Nilai mutlak tidak pernah menghasilkan bilangan negatif.' },
+      { q:'Apakah pernyataan berikut BENAR?', math:'|2x &minus; 4| = 6 &rArr; x = 5 saja', ans:false, explain:'Salah. Ada dua nilai absah penyelesaian: x = 5 dan x = &minus;1.' },
+      { q:'Apakah pernyataan berikut BENAR?', math:'|x| = |&minus;x| untuk semua x &isin; &Ropf;', ans:true, explain:'Ini adalah sifat simetri dasar dari nilai mutlak.' },
+    ]
+  },
+  {
+    id:3, name:'Pencocokan', type:'Cocokkan Jawaban', bg:'bg-lv3', color:'#00E5A0',
+    questions:[
+      { q:'Pilih nilai yang cocok untuk ekspresi berikut', math:'|&minus;8|', opts:['6','7','8','9'], ans:2 },
+      { q:'Pilih nilai yang cocok untuk ekspresi berikut', math:'|3 &minus; 7|', opts:['3','4','5','&minus;4'], ans:1 },
+      { q:'Pilih nilai yang cocok untuk ekspresi berikut', math:'|&minus;2|&sup3;', opts:['&minus;8','6','8','2'], ans:2 },
+      { q:'Pilih nilai yang cocok untuk ekspresi berikut', math:'|10 &minus; 10|', opts:['0','1','10','20'], ans:0 },
+      { q:'Pilih nilai yang cocok untuk ekspresi berikut', math:'&minus;|&minus;5|', opts:['5','&minus;5','0','&minus;25'], ans:1 },
+    ]
+  },
+  {
+    id:4, name:'Aplikasi', type:'Pilihan Ganda', bg:'bg-lv4', color:'#FF6B6B',
+    questions:[
+      { q:'Hitung nilai ekspresi berikut!', math:'|&minus;12| + |&minus;3| = ?', opts:['9','15','&minus;15','&minus;9'], ans:1 },
+      { q:'Berapa jarak antara &minus;5 dan 3 pada garis bilangan?', math:'|&minus;5 &minus; 3| = ?', opts:['2','&minus;8','8','&minus;2'], ans:2 },
+      { q:'Hitung nilai ekspresi berikut!', math:'2|&minus;4| &minus; |&minus;3| = ?', opts:['5','11','&minus;5','1'], ans:0 },
+      { q:'Jika |x| = 9, berapakah nilai x yang negatif?', math:'|x| = 9, x negatif = ?', opts:['9','&minus;9','0','&plusmn;9'], ans:1 },
+      { q:'Hitung nilai ekspresi berikut!', math:'|&minus;6|&sup2; &minus; |4|&sup2; = ?', opts:['4','16','20','&minus;20'], ans:2 },
+    ]
+  },
+  {
+    id:5, name:'Urutkan', type:'Susun Urutan', bg:'bg-lv5', color:'#FFD700',
+    questions:[
+      { q:'Urutkan nilai-nilai berikut dari TERKECIL ke TERBESAR', items:['|&minus;5|','|3|','|&minus;8|','|1|'], vals:[5,3,8,1] },
+      { q:'Urutkan nilai-nilai berikut dari TERKECIL ke TERBESAR', items:['|&minus;2|','|7|','|0|','|&minus;4|'], vals:[2,7,0,4] },
+      { q:'Urutkan nilai-nilai berikut dari TERKECIL ke TERBESAR', items:['|6&minus;2|','|3&minus;9|','|4&minus;4|','|1&minus;7|'], vals:[4,6,0,6] },
+      { q:'Urutkan ekspresi dari TERKECIL ke TERBESAR', items:['&minus;|3|','|&minus;3|','&minus;|&minus;3|','|3|'], vals:[-3,3,-3,3] },
+      { q:'Urutkan nilai-nilai berikut dari TERKECIL ke TERBESAR', items:['|2&sdot;(&minus;3)|','|5&minus;9|','|&minus;1|&sdot;|&minus;1|','|10|&divide;|2|'], vals:[6,4,1,5] },
+    ]
+  },
+  {
+    id:6, name:'Master', type:'Garis Bilangan', bg:'bg-lv6', color:'#FF6BC8',
+    questions:[
+      { q:'Geser penanda ke posisi nilai yang benar pada garis bilangan!', math:'Nilai dari |&minus;4|', ans:4, min:-10, max:10 },
+      { q:'Tentukan posisi solusi positif pada garis bilangan!', math:'|x| = 6, solusi positif x = ?', ans:6, min:-10, max:10 },
+      { q:'Tandai jarak antara kedua titik pada garis bilangan!', math:'Jarak |&minus;3 &minus; 4|', ans:7, min:0, max:15 },
+      { q:'Geser ke nilai solusi positif persamaan!', math:'|x &minus; 2| = 5, solusi positif x = ?', ans:7, min:-5, max:15 },
+      { q:'Tandai hasil ekspresi pada garis bilangan!', math:'|&minus;9| &minus; |&minus;4|', ans:5, min:-10, max:15 },
+    ]
+  }
+];
+
+// ============================================================
+//  STATE
+// ============================================================
+const S = {
+  currentLevel: 0,
+  currentQ: 0,
+  score: 0,
+  lives: 3,
+  correct: 0,
+  startTime: 0,
+  answered: false,
+  levelStars:    [0,0,0,0,0,0],
+  levelScores:   [0,0,0,0,0,0],
+  levelUnlocked: [true,false,false,false,false,false],
+  sortSelected: null,
+  sortSlots:    [],
+  sortItems:    [],
+  numlineVal:   0,
+  numlineDrag:  false,
+};
+
+// ============================================================
+//  NAV
+// ============================================================
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function portalTo(id, label, cb){
+  const pt = document.getElementById('portalTransition');
+  document.getElementById('portalText').textContent = label;
+  pt.className = 'portal-transition show';
+  setTimeout(()=>{
+    if(cb) cb();
+    showScreen(id);
+    pt.className = 'portal-transition hide';
+    setTimeout(()=>{ pt.className='portal-transition'; }, 550);
+  }, 680);
+}
+function goToIntro()     { portalTo('screen-intro','Beranda'); }
+function goToIdentity()  { portalTo('screen-identity','Identitas'); }
+function goToLevels()    { renderLevelGrid(); portalTo('screen-levels','Peta Level'); }
+
+// ============================================================
+//  LEVEL GRID
+// ============================================================
+function canUnlockLevel6(){
+  for(let i=0;i<5;i++) if(S.levelStars[i]<3) return false;
+  return true;
+}
+function computeUnlocked(){
+  for(let i=1;i<=4;i++){
+    S.levelUnlocked[i] = S.levelStars[i-1] >= 1;
+  }
+  S.levelUnlocked[5] = canUnlockLevel6();
+}
+
+function renderLevelGrid(){
+  computeUnlocked();
+  const grid = document.getElementById('levelsGrid');
+  grid.innerHTML = '';
+  LEVELS.forEach((lv,i)=>{
+    const unlocked = S.levelUnlocked[i];
+    const stars = S.levelStars[i];
+    
+    let starHTML = '';
+    for(let s=0; s<3; s++) {
+      starHTML += s < stars ? SVG_ICONS.starFull : SVG_ICONS.starEmpty;
+    }
+
+    const card = document.createElement('div');
+    card.className = `level-card lv${i+1}${!unlocked?' locked':''}${stars>0?' completed':''}`;
+    card.innerHTML = `
+      <div class="level-card-num">${i+1}</div>
+      <div class="level-card-name">${lv.name}</div>
+      <div class="level-card-type">${lv.type}</div>
+      <div class="level-card-stars">${starHTML}</div>
+      ${i===5 && !unlocked ? '<div class="lv6-lock-note">Butuh bintang 3 di semua level</div>' : ''}
+      ${!unlocked ? '<div style="font-size:1.1rem;margin-top:6px;color:var(--gray)">Terkunci</div>' : ''}
+    `;
+    if(unlocked) card.onclick=()=> { playSound('click'); startLevel(i); };
+    grid.appendChild(card);
+  });
+}
+
+// ============================================================
+//  START LEVEL
+// ============================================================
+function startLevel(idx){
+  S.currentLevel = idx;
+  S.currentQ     = 0;
+  S.score        = 0;
+  S.lives        = 3;
+  S.correct      = 0;
+  S.answered     = false;
+  S.startTime    = Date.now();
+
+  const lv = LEVELS[idx];
+  const gs = document.getElementById('screen-game');
+  gs.className = 'screen bg-lv'+(idx+1);
+
+  document.getElementById('topbarLevel').textContent = `Level ${idx+1}: ${lv.name}`;
+  document.getElementById('topbarLevel').style.color = lv.color;
+
+  portalTo('screen-game', `Level ${idx+1} — ${lv.name}`, ()=>{ renderQuestion(); });
+}
+
+function restartLevel(){ startLevel(S.currentLevel); }
+
+// ============================================================
+//  RENDER QUESTION
+// ============================================================
+function renderQuestion(){
+  const lv = LEVELS[S.currentLevel];
+  const q  = lv.questions[S.currentQ];
+  updateTopBar();
+  updateProgress();
+
+  const area = document.getElementById('gameArea');
+  area.innerHTML = '';
+
+  const qh = document.createElement('div');
+  qh.className = 'q-header';
+  qh.innerHTML = `
+    <span class="q-badge" style="background:${lv.color}22;color:${lv.color};border:1px solid ${lv.color}44">${lv.type}</span>
+    <span class="q-progress">Soal ${S.currentQ+1} / ${lv.questions.length}</span>
+  `;
+  area.appendChild(qh);
+
+  const qc = document.createElement('div');
+  qc.className = 'question-card card';
+  qc.innerHTML = `
+    <div class="question-label">Pertanyaan ${S.currentQ+1}</div>
+    <div class="question-text">${q.q}</div>
+    ${q.math ? `<div class="question-math">${q.math}</div>` : ''}
+  `;
+  area.appendChild(qc);
+
+  S.answered = false;
+
+  switch(lv.id){
+    case 1: case 3: case 4: renderMC(area,q);       break;
+    case 2:                  renderTF(area,q);       break;
+    case 5:                  renderSort(area,q);     break;
+    case 6:                  renderNumLine(area,q);  break;
+  }
+}
+
+// ============================================================
+//  TYPE A — MULTIPLE CHOICE (REVISED: RANDOMIZED OPTIONS)
+// ============================================================
+function renderMC(area,q){
+  const grid = document.createElement('div');
+  grid.className = 'options-grid';
+  
+  // Ambil teks string jawaban asli berdasarkan index ans
+  const correctText = q.opts[q.ans];
+  
+  // Gandakan array opsi agar bisa diacak tanpa merusak data utama
+  let shuffledOpts = [...q.opts];
+  
+  // Proses Pengacakan Posisi Opsi (Fisher-Yates Shuffle)
+  for (let i = shuffledOpts.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffledOpts[i], shuffledOpts[j]] = [shuffledOpts[j], shuffledOpts[i]];
+  }
+
+  // Cari di posisi index ke berapa jawaban benar yang baru setelah diacak
+  const newCorrectIndex = shuffledOpts.indexOf(correctText);
+
+  ['A','B','C','D'].forEach((L,i)=>{
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.innerHTML = `<span class="opt-letter">${L}</span><span>${shuffledOpts[i]}</span>`;
+    btn.onclick = ()=>answerMC(btn, i, newCorrectIndex, grid);
+    grid.appendChild(btn);
+  });
+  area.appendChild(grid);
+}
+
+function answerMC(btn,chosen,correct,grid){
+  if(S.answered) return;
+  S.answered = true;
+  grid.querySelectorAll('.option-btn').forEach(b=>b.disabled=true);
+  if(chosen===correct){
+    btn.classList.add('correct');
+    handleCorrect();
+  } else {
+    btn.classList.add('wrong');
+    grid.querySelectorAll('.option-btn')[correct].classList.add('correct');
+    handleWrong();
+  }
+  setTimeout(nextQ, 1600);
+}
+
+// ============================================================
+//  TYPE B — TRUE / FALSE
+// ============================================================
+function renderTF(area,q){
+  const cont = document.createElement('div');
+  cont.className = 'tf-container';
+  const tBtn = document.createElement('button');
+  tBtn.className = 'tf-btn true-btn';
+  tBtn.innerHTML = `<span style="font-family:'Rajdhani';font-size:2.4rem;font-weight:700;color:var(--mint)">B</span><span>BENAR</span>`;
+  const fBtn = document.createElement('button');
+  fBtn.className = 'tf-btn false-btn';
+  fBtn.innerHTML = `<span style="font-family:'Rajdhani';font-size:2.4rem;font-weight:700;color:var(--coral)">S</span><span>SALAH</span>`;
+  tBtn.onclick = ()=>answerTF(true,q,tBtn,fBtn);
+  fBtn.onclick = ()=>answerTF(false,q,tBtn,fBtn);
+  cont.appendChild(tBtn); cont.appendChild(fBtn);
+  area.appendChild(cont);
+}
+function answerTF(chosen,q,tBtn,fBtn){
+  if(S.answered) return;
+  S.answered = true;
+  tBtn.disabled = fBtn.disabled = true;
+  const cb = chosen ? tBtn : fBtn;
+  const rb = q.ans  ? tBtn : fBtn;
+  if(chosen===q.ans){ cb.classList.add('correct'); handleCorrect(q.explain); }
+  else              { cb.classList.add('wrong'); rb.classList.add('correct'); handleWrong(q.explain); }
+  setTimeout(nextQ,1800);
+}
+
+// ============================================================
+//  TYPE E — SORT
+// ============================================================
+function renderSort(area,q){
+  const cont = document.createElement('div');
+  cont.className = 'sort-container';
+
+  const inst = document.createElement('div');
+  inst.className = 'sort-instruction';
+  inst.textContent = 'Pilih item, kemudian tekan slot tujuan. Tekan slot terisi untuk membatalkannya.';
+
+  const itemsRow  = document.createElement('div');
+  itemsRow.className = 'sort-items';
+  const slotsRow = document.createElement('div');
+  slotsRow.className = 'sort-slots';
+
+  let itemData = q.items.map((label,i)=>({label, val:q.vals[i], placed:false, id:i}));
+  for(let i=itemData.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [itemData[i],itemData[j]]=[itemData[j],itemData[i]];
+  }
+  S.sortItems    = itemData;
+  S.sortSlots    = new Array(q.items.length).fill(null);
+  S.sortSelected = null;
+
+  itemData.forEach((item,idx)=>{
+    const el = document.createElement('div');
+    el.className = 'sort-item';
+    el.innerHTML = item.label;
+    el.dataset.idx = idx;
+    el.onclick = ()=>{ playSound('click'); selectSortItem(el,idx,itemsRow); };
+    itemsRow.appendChild(el);
+  });
+
+  for(let i=0;i<q.items.length;i++){
+    const slot = document.createElement('div');
+    slot.className = 'sort-slot';
+    slot.dataset.slot = i;
+    slot.innerHTML = `<span class="slot-num">POSISI ${i+1}</span>`;
+    slot.onclick = ()=>{ playSound('click'); placeInSlot(i,itemsRow,slotsRow); };
+    slotsRow.appendChild(slot);
+  }
+
+  const arrow = document.createElement('div');
+  arrow.style.cssText='text-align:center;color:var(--gray);font-size:.9rem;margin:10px 0;';
+  arrow.textContent = 'Urutan Terkecil ke Terbesar';
+
+  const checkBtn = document.createElement('button');
+  checkBtn.className = 'btn btn-gold';
+  checkBtn.style.cssText = 'margin:16px auto;display:block;';
+  checkBtn.textContent = 'Konfirmasi Urutan';
+  checkBtn.onclick = ()=>checkSort(q,slotsRow,checkBtn);
+
+  cont.appendChild(inst);
+  cont.appendChild(itemsRow);
+  cont.appendChild(arrow);
+  cont.appendChild(slotsRow);
+  cont.appendChild(checkBtn);
+  area.appendChild(cont);
+}
+
+function selectSortItem(el,idx,itemsRow){
+  if(S.sortItems[idx].placed) return;
+  itemsRow.querySelectorAll('.sort-item').forEach(e=>{
+    e.classList.remove('si-selected');
+    e.style.borderColor=''; e.style.background='';
+  });
+  if(S.sortSelected===idx){ S.sortSelected=null; return; }
+  S.sortSelected = idx;
+  el.classList.add('si-selected');
+}
+
+function placeInSlot(slotIdx,itemsRow,slotsRow){
+  if(S.answered) return;
+  const slot = slotsRow.children[slotIdx];
+
+  if(S.sortSlots[slotIdx]!==null && S.sortSelected===null){
+    const prev = S.sortSlots[slotIdx];
+    S.sortSlots[slotIdx] = null;
+    S.sortItems[prev].placed = false;
+    const prevEl = itemsRow.querySelector(`.sort-item[data-idx="${prev}"]`);
+    if(prevEl){ prevEl.style.display=''; prevEl.classList.remove('si-used'); }
+    slot.className = 'sort-slot';
+    slot.innerHTML = `<span class="slot-num">POSISI ${slotIdx+1}</span>`;
+    return;
+  }
+
+  if(S.sortSelected===null) return;
+  const selIdx = S.sortSelected;
+  const item   = S.sortItems[selIdx];
+
+  if(S.sortSlots[slotIdx]!==null){
+    const prev = S.sortSlots[slotIdx];
+    S.sortItems[prev].placed = false;
+    const prevEl = itemsRow.querySelector(`.sort-item[data-idx="${prev}"]`);
+    if(prevEl){ prevEl.style.display=''; prevEl.classList.remove('si-used'); }
+  }
+
+  S.sortSlots[slotIdx] = selIdx;
+  item.placed = true;
+  S.sortSelected = null;
+
+  slot.className = 'sort-slot filled';
+  slot.innerHTML = `<span class="slot-num">POSISI ${slotIdx+1}</span>${item.label}`;
+
+  const itemEl = itemsRow.querySelector(`.sort-item[data-idx="${selIdx}"]`);
+  if(itemEl){ itemEl.style.display='none'; itemEl.classList.add('si-used'); }
+
+  itemsRow.querySelectorAll('.sort-item').forEach(e=>{
+    e.classList.remove('si-selected'); e.style.background='';
+  });
+}
+
+function checkSort(q,slotsRow,btn){
+  if(S.answered) return;
+  if(S.sortSlots.some(s=>s===null)){
+    playSound('wrong');
+    btn.style.animation='shake .4s ease';
+    const orig = btn.textContent;
+    btn.textContent = 'Harap isi seluruh slot!';
+    setTimeout(()=>{ btn.style.animation=''; btn.textContent=orig; },1000);
+    return;
+  }
+  S.answered = true;
+  btn.disabled = true;
+
+  const placed = S.sortSlots.map(idx=>S.sortItems[idx].val);
+  const sorted = [...placed].sort((a,b)=>a-b);
+  let correct = true;
+  placed.forEach((v,i)=>{
+    const slot=slotsRow.children[i];
+    if(v===sorted[i]) slot.classList.add('correct-slot');
+    else { slot.classList.add('wrong-slot'); correct=false; }
+  });
+
+  if(correct) handleCorrect();
+  else handleWrong('Pengurutan nilai Anda belum tepat.');
+  setTimeout(nextQ,2200);
+}
+
+// ============================================================
+//  TYPE F — NUMBER LINE
+// ============================================================
+function renderNumLine(area,q){
+  const cont = document.createElement('div');
+  cont.className = 'numline-container';
+
+  const task = document.createElement('div');
+  task.className = 'numline-task';
+  task.innerHTML = `Tentukan posisi target pada sistem koordinat garis bilangan.`;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'numline-wrap';
+
+  const track = document.createElement('div'); track.className='numline-track';
+  const fill  = document.createElement('div'); fill.className='numline-fill';
+  track.appendChild(fill);
+
+  const ticks = document.createElement('div'); ticks.className='numline-ticks';
+  const range = q.max - q.min;
+  const step  = range > 15 ? 5 : range > 10 ? 2 : 1;
+  for(let v=q.min; v<=q.max; v+=step){
+    const pct = ((v-q.min)/range)*100;
+    const tick = document.createElement('div');
+    tick.className='numline-tick'; tick.style.left=pct+'%';
+    const lbl = document.createElement('span');
+    lbl.className='numline-label'; lbl.textContent=v; lbl.style.left=pct+'%';
+    ticks.appendChild(tick); ticks.appendChild(lbl);
+  }
+
+  const handle = document.createElement('div');
+  handle.className='numline-handle';
+  const initPct = ((0-q.min)/range)*100;
+  handle.style.left = initPct+'%';
+  S.numlineVal = 0;
+
+  wrap.appendChild(track); wrap.appendChild(ticks); wrap.appendChild(handle);
+
+  const valDisp = document.createElement('div');
+  valDisp.className='numline-value-display';
+  valDisp.id='nlVal'; valDisp.textContent='Posisi: 0';
+
+  const row = document.createElement('div'); row.className='numline-check-row';
+  const cb  = document.createElement('button');
+  cb.className='btn btn-gold'; cb.textContent='Konfirmasi Posisi';
+  cb.onclick=()=>checkNL(q,cb);
+  row.appendChild(cb);
+
+  cont.appendChild(task); cont.appendChild(wrap);
+  cont.appendChild(valDisp); cont.appendChild(row);
+  area.appendChild(cont);
+
+  setupNLDrag(wrap,handle,valDisp,q);
+}
+function setupNLDrag(wrap,handle,valDisp,q){
+  const range = q.max - q.min;
+  function getVal(cx){
+    const r = wrap.getBoundingClientRect();
+    let pct = (cx - r.left)/r.width;
+    pct = Math.max(0,Math.min(1,pct));
+    return Math.round(q.min + pct*range);
+  }
+  function update(v){
+    if(S.numlineVal !== v) {
+      S.numlineVal = v;
+      playSound('click');
+    }
+    const pct = ((v-q.min)/range)*100;
+    handle.style.left = pct+'%';
+    valDisp.textContent = 'Posisi: '+v;
+  }
+  handle.addEventListener('mousedown', e=>{ S.numlineDrag=true; e.preventDefault(); });
+  document.addEventListener('mousemove', e=>{ if(S.numlineDrag) update(getVal(e.clientX)); });
+  document.addEventListener('mouseup',  ()=>{ S.numlineDrag=false; });
+  handle.addEventListener('touchstart', e=>{ S.numlineDrag=true; e.preventDefault(); },{passive:false});
+  document.addEventListener('touchmove', e=>{ if(S.numlineDrag) update(getVal(e.touches[0].clientX)); },{passive:true});
+  document.addEventListener('touchend', ()=>{ S.numlineDrag=false; });
+  wrap.addEventListener('click', e=>{ if(!S.numlineDrag) update(getVal(e.clientX)); });
+}
+function checkNL(q,btn){
+  if(S.answered) return;
+  S.answered=true; btn.disabled=true;
+  if(S.numlineVal===q.ans) handleCorrect();
+  else handleWrong(`Hasil perhitungan mutlak yang tepat adalah ${q.ans}`);
+  setTimeout(nextQ,1800);
+}
+
+// ============================================================
+//  ANSWER FEEDBACK
+// ============================================================
+function handleCorrect(msg=''){
+  playSound('correct');
+  S.correct++;
+  const pts = 100;
+  S.score += pts;
+  updateTopBar();
+  showFeedback(true,msg,pts);
+}
+function handleWrong(msg=''){
+  playSound('wrong');
+  S.lives=Math.max(0,S.lives-1);
+  updateTopBar();
+  showFeedback(false,msg,0);
+}
+function showFeedback(ok,msg,pts){
+  const overlay = document.getElementById('feedbackOverlay');
+  const card    = document.getElementById('feedbackCard');
+  const iconHolder = document.getElementById('feedbackIconHolder');
+  
+  card.style.background = ok
+    ? 'linear-gradient(135deg,#0d3a1a,#1a5a2d)'
+    : 'linear-gradient(135deg,#3a0d0d,#5a1a1a)';
+  card.style.border = `2px solid ${ok?'var(--mint)':'var(--coral)'}`;
+
+  iconHolder.innerHTML = ok ? SVG_ICONS.check : SVG_ICONS.cross;
+
+  const msgOk  = ['Luar Biasa!','Tepat Sekali!','Sempurna!','Benar!','Keren!'];
+  const msgErr = ['Belum Tepat', 'Ayo Coba Lagi', 'Tetap Semangat', 'Periksa Kembali'];
+  
+  document.getElementById('feedbackTitle').textContent  = ok ? msgOk[Math.floor(Math.random()*msgOk.length)] : msgErr[Math.floor(Math.random()*msgErr.length)];
+  document.getElementById('feedbackTitle').style.color  = ok ? 'var(--mint)' : 'var(--coral)';
+  document.getElementById('feedbackMsg').textContent    = msg || (ok ? 'Jawaban bernilai benar!' : 'Jawaban kurang tepat.');
+  document.getElementById('feedbackPts').textContent    = ok ? `+${pts} poin` : '';
+  
+  overlay.classList.add('show');
+  setTimeout(()=>overlay.classList.remove('show'), ok?1300:1600);
+}
+
+function updateTopBar(){
+  const h = document.getElementById('topbarLives');
+  h.innerHTML = '';
+  for(let i=0;i<3;i++){
+    h.insertAdjacentHTML('beforeend', i < S.lives ? SVG_ICONS.heartFull : SVG_ICONS.heartEmpty);
+  }
+  document.getElementById('topbarScore').textContent = S.score+' pts';
+}
+function updateProgress(){
+  const lv = LEVELS[S.currentLevel];
+  document.getElementById('progressBarFill').style.width = (S.currentQ/lv.questions.length*100)+'%';
+}
+
+// ============================================================
+//  NEXT Q / LEVEL COMPLETE
+// ============================================================
+function nextQ(){
+  const lv = LEVELS[S.currentLevel];
+  S.currentQ++;
+  if(S.currentQ >= lv.questions.length || S.lives<=0){
+    showLevelComplete();
+  } else {
+    renderQuestion();
+  }
+}
+
+function showLevelComplete(){
+  const lv    = LEVELS[S.currentLevel];
+  const total = lv.questions.length;
+  const secs  = Math.round((Date.now()-S.startTime)/1000);
+  const pct   = S.correct/total;
+  const stars = pct>=.9 ? 3 : pct>=.6 ? 2 : pct>=.3 ? 1 : 0;
+
+  if (stars > 0) {
+    playSound('win');
+  } else {
+    playSound('wrong');
+  }
+
+  S.levelScores[S.currentLevel] = Math.max(S.levelScores[S.currentLevel], S.score);
+  S.levelStars[S.currentLevel]  = Math.max(S.levelStars[S.currentLevel],  stars);
+  computeUnlocked();
+
+  document.getElementById('lcTitle').textContent   = stars>0 ? `Level ${S.currentLevel+1} Selesai` : 'Coba Lagi';
+  document.getElementById('lcScore').textContent   = S.score;
+  document.getElementById('lcCorrect').textContent = `${S.correct}/${total}`;
+  document.getElementById('lcTime').textContent    = secs+'d';
+
+  const lcStars = document.getElementById('lcStars');
+  lcStars.innerHTML='';
+  for(let i=0;i<3;i++){
+    lcStars.insertAdjacentHTML('beforeend', i<stars ? SVG_ICONS.starFull : SVG_ICONS.starEmpty);
+  }
+
+  const nextBtn = document.getElementById('nextLevelBtn');
+  const restartBtn = document.getElementById('restartLevelBtn');
+  restartBtn.textContent = `Ulangi Level ${S.currentLevel+1}`;
+
+  if(S.currentLevel >= LEVELS.length-1){
+    nextBtn.textContent = 'Lihat Hasil Akhir';
+    nextBtn.onclick = () => { playSound('click'); showFinal(); };
+    nextBtn.disabled = false;
+    nextBtn.style.opacity = '1';
+  } else {
+    const nxtIdx = S.currentLevel+1;
+    nextBtn.textContent = nxtIdx===5
+      ? 'Level 6 (Butuh semua bintang 3)'
+      : `Lanjut ke Level ${nxtIdx+1}`;
+    nextBtn.onclick = ()=>{ if(S.levelUnlocked[nxtIdx]) { playSound('click'); nextLevel(); } };
+    const ok = S.levelUnlocked[nxtIdx];
+    nextBtn.disabled = !ok;
+    nextBtn.style.opacity = ok ? '1' : '.45';
+  }
+
+  portalTo('screen-levelcomplete','Hasil Level');
+}
+
+function nextLevel(){
+  if(S.currentLevel>=LEVELS.length-1){ showFinal(); return; }
+  startLevel(S.currentLevel+1);
+}
+
+function showFinal(){
+  playSound('win');
+  const total = S.levelScores.reduce((a,b)=>a+b,0);
+  const totalStars = S.levelStars.reduce((a,b)=>a+b,0);
+  document.getElementById('finalScoreNum').textContent = total;
+  const msgs = [
+    'Terus berlatih dan jangan menyerah!',
+    'Pemahaman dasar nilai mutlak sudah terbentuk.',
+    'Bagus! Kamu memahami konsep nilai mutlak dengan cukup baik.',
+    'Luar biasa! Penguasaan nilai mutlak kamu sangat solid.',
+    'Sempurna! Kamu adalah master nilai mutlak.'
+  ];
+  document.getElementById('finalMessage').textContent = msgs[Math.min(Math.floor(totalStars/4),msgs.length-1)];
+  portalTo('screen-final','Selesai');
+}
+
+function resetGame(){
+  S.levelScores   = [0,0,0,0,0,0];
+  S.levelStars    = [0,0,0,0,0,0];
+  S.levelUnlocked = [true,false,false,false,false,false];
+}
+
+// ---- INIT ----
+renderLevelGrid();
+</script>
+</body>
+</html>
